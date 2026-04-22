@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>圖片壓縮 — 線上工具箱</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/browser-image-compression@2.0.2/dist/browser-image-compression.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+</head>
+<body x-data="imageApp()">
+  <nav class="navbar">
+    <a class="navbar-title" href="../index.html">← 線上工具箱</a>
+    <span class="navbar-badge">圖片壓縮</span>
+  </nav>
+  <div class="subbar">支援 JPG・PNG・HEIC，統一輸出 JPG</div>
+
+  <div class="container" style="padding-bottom:60px">
+
+    <div style="background:white; border-radius:10px; padding:16px; margin-bottom:16px; box-shadow:0 1px 4px rgba(0,0,0,0.08)">
+      <label style="font-size:14px; font-weight:bold; display:block; margin-bottom:8px">目標大小（每張）</label>
+      <div style="display:flex; align-items:center; gap:8px">
+        <input type="number" x-model.number="targetMB" min="0.1" step="0.1"
+               style="width:80px; padding:8px; border:1px solid #bdc3c7; border-radius:6px; font-size:14px">
+        <span style="font-size:14px">MB</span>
+      </div>
+    </div>
+
+    <div class="drop-zone"
+         @dragover.prevent="$el.classList.add('dragover')"
+         @dragleave="$el.classList.remove('dragover')"
+         @drop.prevent="$el.classList.remove('dragover'); addFiles($event.dataTransfer.files)"
+         @click="$refs.fileInput.click()">
+      <input type="file" x-ref="fileInput" multiple
+             accept=".jpg,.jpeg,.png,.heic,.HEIC" style="display:none"
+             @change="addFiles($event.target.files)">
+      <div style="font-size:32px">🖼️</div>
+      <p>點擊或拖曳照片（JPG / PNG / HEIC），可多選</p>
+    </div>
+
+    <template x-if="files.length > 0">
+      <div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px">
+          <span style="font-size:13px; color:#7f8c8d" x-text="files.length + ' 張照片'"></span>
+          <button class="btn btn-secondary btn-sm" @click="files = []; done = false; doneCount = 0">清除</button>
+        </div>
+
+        <div class="file-list" style="max-height:360px; overflow-y:auto">
+          <template x-for="f in files" :key="f.id">
+            <div class="file-item">
+              <div style="width:48px; height:48px; border-radius:4px; overflow:hidden; background:#f8f9fa; flex-shrink:0; display:flex; align-items:center; justify-content:center">
+                <img x-show="f.preview" :src="f.preview" style="width:100%; height:100%; object-fit:cover">
+                <span x-show="!f.preview" style="font-size:20px">📷</span>
+              </div>
+              <div style="flex:1; min-width:0">
+                <div style="font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis" x-text="f.outName"></div>
+                <div style="font-size:11px; color:#7f8c8d" x-text="f.origSize"></div>
+              </div>
+              <div style="font-size:12px; text-align:right; flex-shrink:0; min-width:70px">
+                <span x-show="f.status === 'pending'"    style="color:#7f8c8d">等待中</span>
+                <span x-show="f.status === 'processing'" style="color:#e67e22">處理中...</span>
+                <span x-show="f.status === 'done'"       style="color:#27ae60" x-text="'完成 ' + f.newSize"></span>
+                <span x-show="f.status === 'error'" style="color:#e74c3c; cursor:pointer"
+                      :title="f.errorMsg" @click="alert('失敗原因：' + f.errorMsg)">失敗 ⓘ</span>
+              </div>
+            </div>
+          </template>
+        </div>
+
+        <div x-show="!processing && !done" style="margin-top:12px">
+          <button class="btn btn-primary" @click="startProcess()">開始轉換</button>
+        </div>
+
+        <div x-show="processing" class="msg msg-info" style="margin-top:12px">
+          處理中，請稍候...（<span x-text="doneCount"></span> / <span x-text="files.length"></span>）
+        </div>
+
+        <div x-show="done" style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap">
+          <button class="btn btn-primary" @click="downloadZip()" x-show="blobs.length > 0">下載全部（ZIP）</button>
+          <button class="btn btn-secondary" @click="files = []; done = false; doneCount = 0; blobs = []">重新開始</button>
+        </div>
+
+        <template x-if="done && files.some(f => f.status === 'error')">
+          <div class="msg msg-error" style="margin-top:12px">
+            <b>失敗的檔案：</b>
+            <ul style="margin-top:6px; padding-left:16px">
+              <template x-for="f in files.filter(f => f.status === 'error')" :key="f.id">
+                <li style="font-size:12px; margin-top:4px">
+                  <span x-text="f.outName"></span>：<span x-text="f.errorMsg"></span>
+                </li>
+              </template>
+            </ul>
+          </div>
+        </template>
+      </div>
+    </template>
+
+  </div>
+
+  <div class="footer">工具箱 v1.0</div>
+
+  <script>
+    function imageApp() {
+      return {
+        targetMB: 2,
+        files: [],
+        processing: false,
+        done: false,
+        doneCount: 0,
+        blobs: [],
+        _idCounter: 0,
+
+        addFiles(fileList) {
+          const supported = f => /\.(jpe?g|png|heic)$/i.test(f.name) || f.type.startsWith('image/');
+          const newItems = Array.from(fileList).filter(supported).map(f => ({
+            id: ++this._idCounter,
+            file: f,
+            outName: f.name.replace(/\.[^.]+$/, '.jpg'),
+            origSize: this.fmtSize(f.size),
+            newSize: '',
+            status: 'pending',
+            errorMsg: '',
+            preview: /\.heic$/i.test(f.name) ? null : URL.createObjectURL(f),
+            blob: null,
+          }));
+          this.files = [...this.files, ...newItems];
+        },
+
+        fmtSize(bytes) {
+          return bytes < 1024 * 1024
+            ? (bytes / 1024).toFixed(0) + ' KB'
+            : (bytes / 1024 / 1024).toFixed(2) + ' MB';
+        },
+
+        async isHeic(file) {
+          const buf = await file.slice(0, 12).arrayBuffer();
+          const b = new Uint8Array(buf);
+          const ftyp = String.fromCharCode(b[4], b[5], b[6], b[7]);
+          if (ftyp !== 'ftyp') return false;
+          const brand = String.fromCharCode(b[8], b[9], b[10], b[11]);
+          return ['heic', 'heix', 'mif1', 'msf1', 'hevc', 'hevx'].includes(brand);
+        },
+
+        async startProcess() {
+          this.processing = true;
+          this.done = false;
+          this.doneCount = 0;
+          this.blobs = [];
+
+          for (const item of this.files) {
+            item.status = 'processing';
+            try {
+              let src = item.file;
+              if (await this.isHeic(src)) {
+                const converted = await heic2any({ blob: src, toType: 'image/jpeg', quality: 0.92 });
+                src = new File([converted], item.outName, { type: 'image/jpeg' });
+                item.preview = URL.createObjectURL(src);
+              }
+              const compressed = await imageCompression(src, {
+                maxSizeMB: this.targetMB,
+                fileType: 'image/jpeg',
+                useWebWorker: true,
+              });
+              item.blob = compressed;
+              item.newSize = this.fmtSize(compressed.size);
+              item.status = 'done';
+              this.blobs.push({ name: item.outName, blob: compressed });
+            } catch (e) {
+              item.status = 'error';
+              const msg = e.message || String(e);
+              item.errorMsg = msg.includes('ERR_LIBHEIF') || msg.includes('format not supported')
+                ? '此 HEIC 格式不受瀏覽器支援，請改用本機版工具處理'
+                : msg;
+            }
+            this.doneCount++;
+          }
+          this.processing = false;
+          this.done = true;
+        },
+
+        async downloadZip() {
+          const zip = new JSZip();
+          this.blobs.forEach(({ name, blob }) => zip.file(name, blob));
+          const content = await zip.generateAsync({ type: 'blob' });
+          const url = URL.createObjectURL(content);
+          const a = document.createElement('a');
+          a.href = url; a.download = 'compressed_photos.zip'; a.click();
+          URL.revokeObjectURL(url);
+        }
+      }
+    }
+  </script>
+</body>
+</html>

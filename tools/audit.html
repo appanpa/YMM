@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>資訊稽核工具 - 線上工具箱</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+:root {
+  --primary: #2c3e50;
+  --accent: #e67e22;
+  --success: #16a34a;
+  --danger: #dc2626;
+  --bg: #ecf0f1;
+  --card: #ffffff;
+  --border: #dce1e7;
+  --text: #2c3e50;
+  --muted: #7f8c8d;
+  --radius: 8px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Noto Sans TC', sans-serif; background: var(--bg); color: var(--text); font-size: 14px; }
+
+/* navbar */
+.navbar { background: var(--primary); padding: 14px 24px; display: flex; justify-content: space-between; align-items: center; }
+.navbar-back { color: rgba(255,255,255,.7); font-size: 13px; text-decoration: none; }
+.navbar-back:hover { color: #fff; }
+.navbar-title { color: #fff; font-size: 17px; font-weight: 700; }
+.navbar-badge { background: var(--accent); color: white; font-size: 12px; padding: 3px 12px; border-radius: 12px; font-weight: 700; }
+
+/* tabs */
+.subbar { background: #34495e; padding: 0 24px; display: flex; gap: 0; }
+.tab-btn { padding: 10px 20px; border: none; background: none; cursor: pointer; font-size: 13px; color: rgba(255,255,255,.6); font-family: inherit; border-bottom: 3px solid transparent; transition: color .15s; }
+.tab-btn.active { color: #fff; border-bottom-color: var(--accent); font-weight: 700; }
+.tab-btn:hover { color: #fff; }
+.tab-pane { display: none; }
+.tab-pane.active { display: block; }
+
+/* layout */
+main { max-width: 900px; margin: 24px auto; padding: 0 16px 60px; }
+
+/* step cards */
+.card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 22px 24px; margin-bottom: 16px; }
+.card h2 { font-size: 15px; font-weight: 700; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+.badge { display: inline-block; width: 24px; height: 24px; border-radius: 50%; background: var(--primary); color: #fff; font-size: 12px; font-weight: 700; text-align: center; line-height: 24px; }
+.card h3 { font-size: 14px; font-weight: 700; margin: 14px 0 8px; }
+
+/* upload */
+.upload-group { margin-bottom: 16px; }
+.upload-group > label { display: block; font-weight: 700; margin-bottom: 4px; }
+.hint { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+.drop-zone { border: 2px dashed var(--border); border-radius: var(--radius); padding: 16px; text-align: center; cursor: pointer; color: var(--muted); font-size: 13px; transition: .2s; user-select: none; }
+.drop-zone:hover, .drop-zone.drag-over { border-color: var(--accent); background: #fef9f5; color: var(--accent); }
+.drop-zone input[type=file] { display: none; }
+.file-list { list-style: none; margin-top: 6px; }
+.file-list li { font-size: 12px; color: var(--success); padding: 2px 0; }
+
+/* form */
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 20px; }
+.form-grid.cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+.form-group { display: flex; flex-direction: column; }
+.form-group label { font-size: 12px; font-weight: 700; color: var(--muted); margin-bottom: 4px; }
+.form-group input[type=text], .form-group input[type=number] { border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; font-size: 14px; font-family: inherit; color: var(--text); }
+.form-group input:focus { outline: none; border-color: var(--accent); }
+.sys-ratio-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.sys-ratio-row span { flex: 1; font-size: 13px; }
+.sys-ratio-row input { width: 80px; border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; font-size: 13px; font-family: inherit; }
+.note { font-size: 12px; color: var(--muted); margin-top: 10px; }
+
+/* buttons */
+.btn { display: inline-flex; align-items: center; gap: 6px; padding: 10px 22px; border: none; border-radius: var(--radius); font-size: 14px; font-family: inherit; font-weight: 700; cursor: pointer; transition: background .2s; }
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover { background: #d35400; }
+.btn-primary:disabled { background: #bdc3c7; cursor: not-allowed; }
+.btn-secondary { background: #f1f5f9; color: var(--text); border: 1px solid var(--border); }
+.btn-danger { background: #fee2e2; color: var(--danger); border: 1px solid #fca5a5; }
+.btn-sm { padding: 5px 12px; font-size: 12px; }
+
+/* status */
+.status { padding: 10px 14px; border-radius: var(--radius); font-size: 13px; margin: 12px 0; display: none; }
+.status.show { display: block; }
+.status.info { background: #fef9f5; color: var(--accent); }
+.status.ok { background: #f0fdf4; color: var(--success); }
+.status.err { background: #fef2f2; color: var(--danger); }
+
+/* summary */
+.summary-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 12px; }
+.summary-table td { padding: 6px 10px; border-bottom: 1px solid var(--border); }
+.summary-table td:first-child { color: var(--muted); width: 220px; }
+.summary-table td:last-child { font-weight: 700; }
+
+/* download */
+.dl-btn { display: inline-block; background: var(--success); color: #fff; padding: 9px 18px; border-radius: var(--radius); text-decoration: none; font-size: 13px; font-weight: 700; margin: 4px 6px 4px 0; }
+.dl-btn:hover { background: #15803d; }
+
+/* settings */
+.settings-block { margin-bottom: 24px; }
+.settings-block h3 { font-size: 14px; font-weight: 700; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+.tag-box { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 8px; border: 1px solid var(--border); border-radius: var(--radius); min-height: 42px; background: #fff; }
+.tag { display: inline-flex; align-items: center; gap: 4px; background: #fef3e8; color: #92400e; padding: 3px 10px; border-radius: 20px; font-size: 12px; border: 1px solid #fcd9aa; }
+.tag button { border: none; background: none; cursor: pointer; color: #fcd9aa; font-size: 14px; line-height: 1; padding: 0; }
+.tag button:hover { color: var(--danger); }
+.tag-add { display: flex; gap: 6px; margin-top: 8px; }
+.tag-add input { flex: 1; border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; font-size: 13px; font-family: inherit; }
+.team-block { border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 10px; overflow: hidden; }
+.team-hdr { background: #f8fafc; padding: 8px 12px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--border); }
+.team-hdr input { flex: 1; border: none; background: transparent; font-size: 14px; font-weight: 700; font-family: inherit; }
+.team-hdr input:focus { outline: none; }
+.team-body { padding: 10px 12px; }
+.mtag-list { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.mtag { display: inline-flex; align-items: center; gap: 4px; background: #f0fdf4; color: #166534; padding: 3px 10px; border-radius: 20px; font-size: 12px; border: 1px solid #bbf7d0; }
+.mtag button { border: none; background: none; cursor: pointer; color: #86efac; font-size: 13px; line-height: 1; }
+.mtag button:hover { color: var(--danger); }
+.footer { background: var(--primary); padding: 8px 24px; text-align: right; color: var(--muted); font-size: 11px; position: fixed; bottom: 0; width: 100%; }
+@media (max-width: 600px) { .form-grid, .form-grid.cols-3 { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+
+<nav class="navbar">
+  <div style="display:flex;align-items:center;gap:16px">
+    <a class="navbar-back" href="../index.html">← 工具箱</a>
+    <span class="navbar-title">資訊稽核工具</span>
+  </div>
+</nav>
+
+<div class="subbar">
+  <button class="tab-btn active" data-tab="audit">稽核流程</button>
+  <button class="tab-btn" data-tab="settings">⚙ 設定</button>
+</div>
+
+<!-- ── 稽核流程 tab ── -->
+<div id="tab-audit" class="tab-pane active">
+<main>
+
+  <div class="card">
+    <h2><span class="badge">1</span>上傳檔案</h2>
+    <div class="upload-group">
+      <label>日誌 Excel（必填，可多選）</label>
+      <div class="hint">警政日誌及 e 網通查詢日誌 .xlsx，可一次選取多份</div>
+      <div class="drop-zone" id="logZone">點擊或拖曳日誌 Excel 至此<input type="file" id="logInput" accept=".xlsx" multiple></div>
+      <ul class="file-list" id="logList"></ul>
+    </div>
+    <div class="upload-group">
+      <label>勤務分配表（選填，可多選）</label>
+      <div class="hint">用於值宿與休假判斷，一天一份</div>
+      <div class="drop-zone" id="dutyZone">點擊或拖曳勤務分配表至此<input type="file" id="dutyInput" accept=".xlsx" multiple></div>
+      <ul class="file-list" id="dutyList"></ul>
+    </div>
+    <div class="upload-group">
+      <label>Word 稽核報告範本（選填）</label>
+      <div class="hint">含 {{佔位符}} 的 .docx 範本，如 temp.docx</div>
+      <div class="drop-zone" id="wordZone">點擊或拖曳 Word 範本至此<input type="file" id="wordInput" accept=".docx"></div>
+      <ul class="file-list" id="wordList"></ul>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2><span class="badge">2</span>填入稽核資訊</h2>
+    <div class="form-grid cols-3">
+      <div class="form-group"><label>稽核年份（民國）</label><input type="text" id="auditYear" placeholder="例如 115" maxlength="3"></div>
+      <div class="form-group"><label>稽核執行月份</label><input type="text" id="dutyMonth" placeholder="例如 4" maxlength="2"></div>
+      <div class="form-group"><label>稽核執行日期</label><input type="text" id="dutyDate" placeholder="例如 22" maxlength="2"></div>
+    </div>
+    <div class="form-grid" style="margin-top:12px">
+      <div class="form-group"><label>被稽核月份（日誌所屬）</label><input type="text" id="auditMonth" placeholder="例如 3"></div>
+      <div class="form-group"><label>總稽核比例（%）</label><input type="number" id="auditRatio" value="2" min="0" max="100" step="0.1"></div>
+    </div>
+    <div style="margin-top:14px">
+      <p style="font-size:13px;color:var(--muted);margin-bottom:8px">各系統個別比例（選填，留空依總比例）</p>
+      <div class="sys-ratio-row" data-sys="戶政資料系統(OI2)"><span>戶政資料系統(OI2)</span><input type="number" placeholder="%" min="0" max="100"></div>
+      <div class="sys-ratio-row" data-sys="國民身分證相片系統(OJ)"><span>國民身分證相片系統(OJ)</span><input type="number" placeholder="%" min="0" max="100"></div>
+      <div class="sys-ratio-row" data-sys="M_Police"><span>M_Police</span><input type="number" placeholder="%" min="0" max="100"></div>
+      <div class="sys-ratio-row" data-sys="智慧分析決策支援系統(AI)"><span>智慧分析決策支援系統(AI)</span><input type="number" placeholder="%" min="0" max="100"></div>
+    </div>
+    <p class="note" id="cfgNote"></p>
+  </div>
+
+  <div class="card">
+    <h2><span class="badge">3</span>執行稽核</h2>
+    <button class="btn btn-primary" id="runBtn">▶ 開始稽核</button>
+    <div class="status" id="statusMsg"></div>
+    <div id="summaryArea"></div>
+  </div>
+
+  <div class="card">
+    <h2><span class="badge">4</span>下載結果</h2>
+    <div id="downloadArea"><p style="color:var(--muted);font-size:13px">執行稽核後，下載連結會出現在這裡。</p></div>
+  </div>
+
+</main>
+</div>
+
+<!-- ── 設定 tab ── -->
+<div id="tab-settings" class="tab-pane">
+<main>
+  <div class="card">
+    <h2>設定</h2>
+    <p style="color:var(--muted);font-size:13px;margin-bottom:14px">所有設定自動儲存至瀏覽器，下次開啟自動帶入。</p>
+    <div style="display:flex;gap:10px;margin-bottom:20px">
+      <button class="btn btn-primary btn-sm" id="saveBtn">儲存設定</button>
+      <button class="btn btn-secondary btn-sm" id="resetBtn">恢復預設值</button>
+    </div>
+    <div class="status" id="saveMsg"></div>
+
+    <div class="settings-block">
+      <h3>排除系統清單</h3>
+      <p class="note" style="margin-bottom:8px">這些系統的記錄在稽核時完全排除。</p>
+      <div class="tag-box" id="sysTagBox"></div>
+      <div class="tag-add"><input type="text" id="sysTagIn" placeholder="例如：勤務管理系統(LMS)"><button class="btn btn-secondary btn-sm" id="sysTagBtn">新增</button></div>
+    </div>
+
+    <div class="settings-block">
+      <h3>各小隊成員名單</h3>
+      <p class="note" style="margin-bottom:8px">成員格式：<code>ID-姓名</code>，例如 2XHM13H2-楊永彰</p>
+      <div id="teamsArea"></div>
+      <button class="btn btn-secondary btn-sm" id="addTeamBtn" style="margin-top:8px">＋ 新增小隊</button>
+    </div>
+
+    <div class="settings-block">
+      <h3>M-Police 載具對應人員</h3>
+      <p class="note" style="margin-bottom:8px">填入姓名（不含 ID），程式自動對應查詢記錄。</p>
+      <div id="devicesArea"></div>
+      <button class="btn btn-secondary btn-sm" id="addDevBtn" style="margin-top:8px">＋ 新增載具</button>
+    </div>
+
+    <div class="settings-block">
+      <h3>模糊事由關鍵字</h3>
+      <div class="tag-box" id="vagueTagBox"></div>
+      <div class="tag-add"><input type="text" id="vagueTagIn" placeholder="例如：辦案"><button class="btn btn-secondary btn-sm" id="vagueTagBtn">新增</button></div>
+    </div>
+
+    <div class="settings-block">
+      <h3>必填查詢事由的系統</h3>
+      <p class="note" style="margin-bottom:8px">查詢事由空白時，才標記事由異常（僅限以下系統）。</p>
+      <div class="tag-box" id="reqTagBox"></div>
+      <div class="tag-add"><input type="text" id="reqTagIn" placeholder="例如：戶政資料系統(OI2)"><button class="btn btn-secondary btn-sm" id="reqTagBtn">新增</button></div>
+    </div>
+
+    <div class="settings-block">
+      <h3>特定高風險系統</h3>
+      <p class="note" style="margin-bottom:8px">存取以下系統，無論原因，一律標記異常。</p>
+      <div class="tag-box" id="suspTagBox"></div>
+      <div class="tag-add"><input type="text" id="suspTagIn" placeholder="例如：警政婦幼案件管理系統(DH2)"><button class="btn btn-secondary btn-sm" id="suspTagBtn">新增</button></div>
+    </div>
+  </div>
+</main>
+</div>
+
+<div class="footer">工具箱 v1.0</div>
+
+<!-- CDN -->
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pizzip@3.1.6/dist/pizzip.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/docxtemplater@3.50.0/build/docxtemplater.js"></script>
+
+<script>
+// ── Tab 切換 ────────────────────────────────────────
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+  });
+});
+
+// ── 預設設定 ────────────────────────────────────────
+const DEFAULT_CONFIG = {
+  systemsToRemove: ["人事管理資訊平台(OA2)","公文線上簽核系統(OO)","電子化簿冊系統(OC)","警用裝備管理系統(MB2)","數位情資科技偵查教育訓練平臺(WM)","勤務管理系統(LMS)","涉案車輛軌跡查詢系統(DE)","金融資料調閱暨聯防通報電子化平臺系統(EF)","刑案紀錄處理系統(ER)"],
+  teams: {
+    "第一小隊":  ["2XHM13H2-楊永彰","P3G2WSYC-劉名軒","GNWRLMRN-白聖富"],
+    "第二小隊":  ["S74BT2X4-賴冠傑","D9VH4RVE-莊弘傳","53M89K79-周家禾","MF5FVGUF-翁玉娟"],
+    "第三小隊":  ["NUWJLV8X-徐連泰","UH44FE9V-林敬堯","W4MK8G3F-藍稚凱"],
+    "第四小隊":  ["F6HG6AEG-賴怡旋","M5GEH3K6-陳冠任","GPU2W68P-宋皇毅","GS8XVBWY-陳冠宇"],
+    "第一分隊主管及大隊部主管": ["YTC743JP-楊宏權","VRUYNY25-胡耀庭","YZZ2FJFG-邱之伶","Z90QO5DP-連健雄","F4SW95HU-張詔雄"]
+  },
+  mpoliceDevices: {
+    "IP14AA2FU101": ["楊永彰","劉名軒","白聖富"],
+    "IPSE1A2FU201": ["賴冠傑","莊弘傳","翁玉娟"],
+    "IP15BA2FU201": ["徐連泰","林敬堯","藍稚凱"]
+  },
+  vagueReasons: ["辦案","查詢","公務","測試"],
+  reasonRequiredSystems: ["戶政資料系統(OI2)","國民身分證相片系統(OJ)","警政相片比對系統(OQ3)"],
+  suspiciousSystems: ["警政婦幼案件管理系統(DH2)"],
+  queryExtractionRules: {
+    "戶政資料系統(OI2)":     [["身分證號=",5],["戶籍地址=",5],["姓名=",1]],
+    "車籍資料系統(TA2)":     [["車號=",3],["車主姓名=",1],["身分證號=",5]],
+    "國民身分證相片系統(OJ)": [["身分證號=",5],["姓名=",1]],
+    "智慧分析決策支援系統(AI)":[["查詢條件=",2],["身分證號=",5],["姓名=",1],["車號=",3]],
+    "警政婦幼案件管理系統(DH2)":[["身分證號=",5],["姓名=",1]],
+    "刑案資訊系統(CF)":      [["身分證號=",5],["姓名=",1]],
+    "涉案車輛軌跡查詢系統(DE)":[["車號=",3],["車牌號碼=",3]],
+    "案件管理_e化查捕逃犯(EZE7)":[["身分證號=",5],["姓名=",1]],
+    "停車數位多元化查詢系統(TN2)":[["停車車號=",3]],
+    "警政相片比對系統(OQ3)": [["相片檔名=",5]],
+    "國人入出境(IQ2)":       [["身分證號=",5]]
+  }
+};
+
+// ── 設定管理 ────────────────────────────────────────
+const CFG_KEY = 'auditConfig';
+let cfg = (() => { try { return JSON.parse(localStorage.getItem(CFG_KEY)) || JSON.parse(JSON.stringify(DEFAULT_CONFIG)); } catch { return JSON.parse(JSON.stringify(DEFAULT_CONFIG)); } })();
+const saveCfg = () => localStorage.setItem(CFG_KEY, JSON.stringify(cfg));
+const buildUserTeamMap = () => { const m = {}; for (const [t,ms] of Object.entries(cfg.teams)) ms.forEach(u => m[u] = t); return m; };
+const extractName = a => { const i = a.lastIndexOf('-'); return i !== -1 ? a.slice(i+1).trim() : a.trim(); };
+
+// ── 勤務表解析 ──────────────────────────────────────
+const DutyParser = {
+  cleanName(s) { return s ? String(s).replace(/[（(][^）)]*[）)]/g,'').trim() : ''; },
+  parseDateFromTitle(s) {
+    const m = String(s||'').match(/(\d{2,3})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/);
+    if (!m) return null;
+    const y = parseInt(m[1]) < 1911 ? parseInt(m[1])+1911 : parseInt(m[1]);
+    return `${y}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`;
+  },
+  sheetToArray(ws) {
+    const rng = XLSX.utils.decode_range(ws['!ref']||'A1');
+    const rows = [];
+    for (let r = rng.s.r; r <= rng.e.r; r++) {
+      const row = [];
+      for (let c = rng.s.c; c <= rng.e.c; c++) { const cell = ws[XLSX.utils.encode_cell({r,c})]; row.push(cell ? cell.v : null); }
+      rows.push(row);
+    }
+    return rows;
+  },
+  parseFile(buf) {
+    const wb = XLSX.read(buf, {type:'array'});
+    const sn = wb.SheetNames.find(n => n.includes('勤務分配表')) || wb.SheetNames[0];
+    const rows = this.sheetToArray(wb.Sheets[sn]);
+    const dateKey = this.parseDateFromTitle(String((rows[0]||[])[6]||''));
+    if (!dateKey) return null;
+    let oCol = -1;
+    (rows[2]||[]).forEach((v,i) => { if (String(v||'').includes('值宿')) oCol = i; });
+    const personnel = {};
+    for (let r = 3; r <= Math.min(rows.length-1, 10); r++) {
+      const row = rows[r]||[];
+      [[7,8,9],[10,11,12],[13,14,15]].forEach(([cc,nc,lc]) => {
+        const code = row[cc], name = row[nc], leave = row[lc];
+        if (code !== null && code !== undefined && !isNaN(Number(code))) {
+          const cn = this.cleanName(String(name||''));
+          if (cn) personnel[Number(code)] = { name: cn, onLeave: leave !== null && leave !== undefined && String(leave).trim() !== '' };
+        }
+      });
+    }
+    const overnight = new Set();
+    if (oCol !== -1) for (let r = 7; r < rows.length; r++) { const v = (rows[r]||[])[oCol]; if (v) String(v).split(/[,，、\s]+/).forEach(p => { const n = parseInt(p); if (!isNaN(n)) overnight.add(n); }); }
+    const oNames = [], lNames = [];
+    for (const [code, info] of Object.entries(personnel)) { if (overnight.has(Number(code))) oNames.push(info.name); if (info.onLeave) lNames.push(info.name); }
+    return { dateKey, overnight: oNames, onLeave: lNames };
+  },
+  parseFiles(bufs) {
+    const map = {};
+    for (const b of bufs) { const r = this.parseFile(b); if (r) map[r.dateKey] = { overnight: r.overnight, onLeave: r.onLeave }; }
+    return map;
+  }
+};
+
+// ── 日誌處理 ────────────────────────────────────────
+const LogProcessor = {
+  parseDate(val) {
+    const s = String(val||'').trim();
+    const m = s.match(/^(\d{2,3})\/(\d{1,2})\/(\d{1,2})\s+(\d{1,2}):(\d{1,2}):?(\d{0,2})/);
+    if (m) { const y = parseInt(m[1]) < 1911 ? parseInt(m[1])+1911 : parseInt(m[1]); return new Date(y, parseInt(m[2])-1, parseInt(m[3]), parseInt(m[4]), parseInt(m[5]), parseInt(m[6]||0)); }
+    const d = new Date(s); return isNaN(d) ? null : d;
+  },
+  readFile(buf) {
+    const wb = XLSX.read(buf, {type:'array'});
+    const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {header:1, defval:null});
+    const headers = data[8]; if (!headers) return [];
+    const rows = [];
+    for (let i = 9; i < data.length; i++) {
+      const row = data[i]; if (!row || row.every(v => v===null)) continue;
+      const obj = {}; headers.forEach((h,idx) => obj[String(h||`col_${idx}`)] = row[idx]!==undefined ? row[idx] : null);
+      rows.push(obj);
+    }
+    return rows;
+  },
+  process(bufs, utMap) {
+    let all = [];
+    for (const b of bufs) all = all.concat(this.readFile(b));
+    all.forEach(r => { if (r['作業種類']) r['作業種類'] = String(r['作業種類']).trim(); });
+    const rmSet = new Set(cfg.systemsToRemove);
+    const filtered = all.filter(r => !rmSet.has(r['作業種類']));
+    filtered.forEach(r => {
+      r._dt   = this.parseDate(r['作業時間']);
+      r._name = extractName(String(r['使用者']||''));
+      r._team = utMap[r['使用者']] || '未分類';
+      r['查詢事由'] = String(r['查詢事由']||'').trim();
+    });
+    return filtered;
+  }
+};
+
+// ── 異常偵測 ────────────────────────────────────────
+const AnomalyDetector = {
+  toDateKey(dt) { return dt ? `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}` : ''; },
+  detect(rows, scheduleMap) {
+    const vagueSet = new Set(cfg.vagueReasons);
+    const reqSet   = new Set(cfg.reasonRequiredSystems);
+    const suspSet  = new Set(cfg.suspiciousSystems);
+    const abnormal = [];
+    for (const row of rows) {
+      const reasons = [], dt = row._dt, name = row._name, system = row['作業種類']||'', reason = row['查詢事由']||'';
+      const dk = dt ? this.toDateKey(dt) : '';
+      const sch = scheduleMap[dk] || { overnight:[], onLeave:[] };
+      if (sch.onLeave.includes(name)) reasons.push('休假日查詢');
+      if (dt && !sch.onLeave.includes(name)) { const h = dt.getHours(); if (h >= 23 || h < 8) if (!sch.overnight.includes(name)) reasons.push('時間異常'); }
+      if ((reason==='' && reqSet.has(system)) || vagueSet.has(reason)) reasons.push('事由異常');
+      if (suspSet.has(system)) reasons.push('存取特定系統');
+      if (reasons.length) { row._anomaly = reasons.join('、'); abnormal.push(row); }
+    }
+    return abnormal;
+  }
+};
+
+// ── 抽樣 ────────────────────────────────────────────
+const Sampler = {
+  rnd(arr, n) { const c=[...arr]; for(let i=c.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[c[i],c[j]]=[c[j],c[i]];} return c.slice(0,n); },
+  sample(rows, abnormal, sysRatios) {
+    const teams = Object.keys(cfg.teams);
+    const teamsWithRec = teams.filter(t => rows.some(r => r._team===t));
+    const target = Math.max(Math.round(rows.length * (parseFloat(document.getElementById('auditRatio').value)||2) / 100), teamsWithRec.length);
+    const sel = new Set(), selected = [];
+    const pick = r => { if (!sel.has(r)) { sel.add(r); selected.push(r); } };
+
+    for (const [sys, ratio] of Object.entries(sysRatios)) {
+      const pool = rows.filter(r => sys==='M_Police' ? (r['作業種類']||'').toLowerCase().includes('m_police') : r['作業種類']===sys);
+      if (!pool.length) continue;
+      const n = Math.min(Math.round(pool.length*(ratio/100)), pool.length);
+      const ab = pool.filter(r=>r._anomaly), nm = pool.filter(r=>!r._anomaly);
+      const ap = this.rnd(ab, Math.min(n, ab.length)), np = this.rnd(nm, Math.max(0,n-ap.length));
+      [...ap,...np].forEach(pick);
+    }
+    for (const t of teams) {
+      if (selected.some(r => r._team===t)) continue;
+      const tab = abnormal.filter(r=>r._team===t&&!sel.has(r)), tp = rows.filter(r=>r._team===t&&!r._anomaly&&!sel.has(r));
+      if (tab.length) pick(this.rnd(tab,1)[0]); else if (tp.length) pick(this.rnd(tp,1)[0]);
+    }
+    const rem1 = target - selected.length;
+    if (rem1 > 0) { const ua = abnormal.filter(r=>!sel.has(r)); this.rnd(ua, Math.min(rem1,ua.length)).forEach(pick); }
+    const rem2 = target - selected.length;
+    if (rem2 > 0) { const np = rows.filter(r=>!r._anomaly&&!sel.has(r)); this.rnd(np, Math.min(rem2,np.length)).forEach(pick); }
+    return selected;
+  }
+};
+
+// ── Excel 輸出 ──────────────────────────────────────
+const HIDDEN = new Set(['_dt','_name','_team','_anomaly']);
+function prepareRows(rows) {
+  const sorted = [...rows].sort((a,b)=>(a._dt||0)-(b._dt||0));
+  const week = dt => { if(!dt) return 1; const d=dt.getDate(); return d<=7?1:d<=14?2:d<=21?3:4; };
+  const out=[]; let lw=null;
+  for (const r of sorted) { const w=week(r._dt); if(lw!==null&&w!==lw) out.push(null); out.push(r); lw=w; }
+  return out;
+}
+function exportAuditExcel(sampled, abnormal) {
+  const wb = XLSX.utils.book_new();
+  const allR = sampled.length ? sampled : abnormal;
+  if (!allR.length) return null;
+  const headers = Object.keys(allR[0]).filter(k => !HIDDEN.has(k));
+  if (abnormal.length) {
+    const hh=[...headers,'異常原因'], data=[hh];
+    for (const r of abnormal) data.push([...headers.map(h=>r[h]!==undefined?r[h]:''), r._anomaly||'']);
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(data), '異常及可疑查詢總表');
+  }
+  for (const team of Object.keys(cfg.teams)) {
+    const tr = sampled.filter(r=>r._team===team); if (!tr.length) continue;
+    const prepared = prepareRows(tr);
+    const data=[headers];
+    for (const r of prepared) data.push(r===null ? headers.map(()=>'') : headers.map(h=>r[h]!==undefined?r[h]:''));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(data), team);
+  }
+  return new Blob([XLSX.write(wb,{bookType:'xlsx',type:'array'})], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+}
+
+function exportTable3(rows, sampled, yr, mo) {
+  const wb = XLSX.utils.book_new();
+  const data=[['表三'],[`內政部警政署保安警察第七總隊${yr}年${mo}月份警政日誌稽核工作執行情形調查表`],[''],['日誌稽核工作\n執行機關','日誌稽核工作\n執行單位','受檢機關(單位)','受檢單位\n總查詢筆數','稽核筆數','稽核紀錄\n百分比']];
+  let tq=0,ts=0;
+  for (const t of Object.keys(cfg.teams)) {
+    const tc=rows.filter(r=>r._team===t).length, sc=sampled.filter(r=>r._team===t).length;
+    data.push(['保安警察第七總隊','刑事警察大隊',t,tc,sc,tc>0?(sc/tc).toFixed(6):0]);
+    tq+=tc; ts+=sc;
+  }
+  data.push(['','','總計',tq,ts,tq>0?(ts/tq).toFixed(6):0]);
+  const ws=XLSX.utils.aoa_to_sheet(data); ws['!cols']=[{wch:16},{wch:14},{wch:20},{wch:14},{wch:10},{wch:12}];
+  XLSX.utils.book_append_sheet(wb,ws,'彙整表');
+  const sysHdr=['戶政資料系統','車籍資訊系統','刑案資訊系統','智慧分析決策支援系統','M-Police'];
+  const sysFn=[r=>r['作業種類']==='戶政資料系統(OI2)',r=>r['作業種類']==='車籍資料系統(TA2)',r=>r['作業種類']==='刑案資訊系統(CF)',r=>r['作業種類']==='智慧分析決策支援系統(AI)',r=>(r['作業種類']||'').toLowerCase().includes('m_police')];
+  const d2=[sysHdr];
+  for (const t of Object.keys(cfg.teams)) { const tr=rows.filter(r=>r._team===t); if(tr.length) d2.push(sysFn.map(f=>tr.filter(f).length)); }
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(d2),'各系統查詢筆數');
+  return new Blob([XLSX.write(wb,{bookType:'xlsx',type:'array'})], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+}
+
+function exportMP(rows, sampled, yr, mo) {
+  const wb=XLSX.utils.book_new();
+  const data=[[''],[``,`${yr}年${mo}月M-Police統計表`],[''],[''],[``, '單位','載具名稱','查詢次數','稽核次數','稽核比例']];
+  for (const [dev, members] of Object.entries(cfg.mpoliceDevices||{})) {
+    const ms=new Set(members);
+    const tc=rows.filter(r=>(r['作業種類']||'').toLowerCase().includes('m_police')&&ms.has(r._name)).length;
+    const sc=sampled.filter(r=>(r['作業種類']||'').toLowerCase().includes('m_police')&&ms.has(r._name)).length;
+    data.push(['','刑警大隊',dev,tc,sc,tc>0?(sc/tc).toFixed(4):'']);
+  }
+  data.push(['','','以下空白']);
+  const ws=XLSX.utils.aoa_to_sheet(data); ws['!cols']=[{wch:4},{wch:12},{wch:18},{wch:10},{wch:10},{wch:10}];
+  XLSX.utils.book_append_sheet(wb,ws,'工作表1');
+  return new Blob([XLSX.write(wb,{bookType:'xlsx',type:'array'})], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+}
+
+// ── Word 輸出 ────────────────────────────────────────
+function cleanQueryCond(cond, sys) {
+  if (!cond || typeof cond !== 'string') return '';
+  const rules = sys.toLowerCase().includes('m_police') ? [["車號=",3],["身分證號=",5],["姓名=",1]] : (cfg.queryExtractionRules[sys]);
+  if (!rules) return cond.length>15 ? cond.slice(0,15)+'...' : cond;
+  for (const [prefix,len] of rules) {
+    const idx=cond.indexOf(prefix); if(idx===-1) continue;
+    let raw=cond.slice(idx+prefix.length).trim(), val='';
+    if(raw.startsWith('["')){const e=raw.indexOf('"]');val=e!==-1?raw.slice(2,e):raw;}
+    else if(raw.startsWith('"')){const e=raw.indexOf('"',1);val=e!==-1?raw.slice(1,e):raw;}
+    else val=raw;
+    const ext=val.slice(0,len), mask=prefix.includes('身分證號')||prefix.includes('查詢條件')?'*****':prefix.includes('車號')||prefix.includes('車牌')?'****':'**';
+    return `${prefix}「${ext}${mask}」`;
+  }
+  return cond.length>15 ? cond.slice(0,15)+'...' : cond;
+}
+
+function generateDetailedText(sampled, yr, mo) {
+  if (!sampled.length) return '本次抽樣無任何資料可供分析。';
+  const grp={};
+  for (const r of sampled) {
+    const dt=r._dt; if(!dt) continue;
+    const md=`${dt.getMonth()+1}月${dt.getDate()}日`;
+    const key=`${r._team}|${r['使用者']}|${md}|${r['作業種類']}`;
+    if(!grp[key]) grp[key]={team:r._team,user:r['使用者'],md,sys:r['作業種類'],cnt:0,cond:r['查詢條件'],day:dt.getDate()};
+    grp[key].cnt++;
+  }
+  const g={g1:[],g2:[],g3:[],g4:[]};
+  for (const item of Object.values(grp)) {
+    const name=item.user.includes('-')?item.user.split('-').pop():item.user;
+    const qcond=cleanQueryCond(String(item.cond||''), item.sys);
+    const qt=qcond.includes('=')?qcond:`「${qcond}」`;
+    const line=`查本大隊${item.team}${name}於${item.md}擔服＿＿＿＿勤務(8-20)，以${qt}等，使用「${item.sys}」計${item.cnt}筆，為＿＿＿＿所需，於勤務時段使用，符合規定。`;
+    const d=item.day;
+    if(d<=7)g.g1.push(line); else if(d<=14)g.g2.push(line); else if(d<=21)g.g3.push(line); else g.g4.push(line);
+  }
+  const gyear=parseInt(yr)<1911?parseInt(yr)+1911:parseInt(yr);
+  const lastDay=new Date(gyear,parseInt(mo),0).getDate();
+  const parts=[];
+  const add=(arr,s,e)=>{if(!arr.length)return;parts.push(`本大隊${yr}年${mo}月${s}日至${mo}月${e}日查詢紀錄，稽核情形如下：`);arr.forEach((l,i)=>parts.push(`(${i+1})\t${l}`));};
+  add(g.g1,1,7); add(g.g2,8,14); add(g.g3,15,21); add(g.g4,22,lastDay);
+  return parts.join('\n');
+}
+
+async function fillWord(tmplBuf, ctx) {
+  const PZ=window.PizZip, DT=window.docxtemplater||window.Docxtemplater;
+  if(!PZ||!DT) throw new Error('docxtemplater 或 PizZip 未載入');
+  const zip=new PZ(tmplBuf);
+  const doc=new DT(zip,{delimiters:{start:'{{',end:'}}'},paragraphLoop:true,linebreaks:true});
+  doc.render(ctx);
+  return doc.getZip().generate({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
+}
+
+// ── 主流程 ───────────────────────────────────────────
+const logFiles=[], dutyFiles=[];
+let wordFile=null;
+
+function bindDrop(zoneId, inputId, listId, onAdd, getFiles) {
+  const zone=document.getElementById(zoneId), input=document.getElementById(inputId), list=document.getElementById(listId);
+  const add = files => { [...files].forEach(f=>onAdd(f)); list.innerHTML=(getFiles()||[]).map(f=>`<li>✓ ${f.name}</li>`).join(''); };
+  zone.addEventListener('click',()=>input.click());
+  input.addEventListener('change',e=>add(e.target.files));
+  zone.addEventListener('dragover',e=>{e.preventDefault();zone.classList.add('drag-over');});
+  zone.addEventListener('dragleave',()=>zone.classList.remove('drag-over'));
+  zone.addEventListener('drop',e=>{e.preventDefault();zone.classList.remove('drag-over');add(e.dataTransfer.files);});
+}
+
+const readFile = f => new Promise((res,rej)=>{ const r=new FileReader(); r.onload=e=>res(e.target.result); r.onerror=rej; r.readAsArrayBuffer(f); });
+
+function setStatus(msg, cls) {
+  const el=document.getElementById('statusMsg');
+  el.textContent=msg; el.className='status show '+cls;
+}
+
+function showSummary(rows, abnormal, sampled) {
+  const teams=Object.keys(cfg.teams), total=rows.length, ratio=parseFloat(document.getElementById('auditRatio').value)||2;
+  let html=`<h3 style="font-size:14px;margin:14px 0 8px">統計摘要</h3>
+  <table class="summary-table">
+    <tr><td>總查詢筆數</td><td>${total.toLocaleString()} 筆</td></tr>
+    <tr><td>異常及可疑筆數</td><td>${abnormal.length.toLocaleString()} 筆</td></tr>
+    <tr><td>稽核比例</td><td>${ratio}%</td></tr>
+    <tr><td>實際稽核筆數</td><td>${sampled.length.toLocaleString()} 筆</td></tr>
+  </table>
+  <h3 style="font-size:14px;margin:14px 0 8px">各小隊</h3>
+  <table class="summary-table">`;
+  for (const t of teams) html+=`<tr><td>${t}</td><td>總計 ${rows.filter(r=>r._team===t).length} 筆 ／ 稽核 ${sampled.filter(r=>r._team===t).length} 筆</td></tr>`;
+  html+='</table>';
+  document.getElementById('summaryArea').innerHTML=html;
+}
+
+async function run() {
+  const btn=document.getElementById('runBtn');
+  if (!logFiles.length) { setStatus('請先上傳至少一份日誌 Excel。','err'); return; }
+  const yr=document.getElementById('auditYear').value.trim(), mo=document.getElementById('auditMonth').value.trim();
+  if (!yr||!mo) { setStatus('請填入稽核年份與被稽核月份。','err'); return; }
+  const dm=document.getElementById('dutyMonth').value.trim(), dd=document.getElementById('dutyDate').value.trim();
+  const sysRatios={};
+  document.querySelectorAll('.sys-ratio-row').forEach(row=>{ const sys=row.dataset.sys, v=parseFloat(row.querySelector('input').value); if(sys&&!isNaN(v)&&v>0) sysRatios[sys]=v; });
+
+  btn.disabled=true;
+  document.getElementById('downloadArea').innerHTML='';
+  document.getElementById('summaryArea').innerHTML='';
+
+  try {
+    setStatus('讀取日誌...','info');
+    const logBufs = await Promise.all(logFiles.map(readFile));
+    const dutyBufs = await Promise.all(dutyFiles.map(readFile));
+
+    setStatus('解析勤務分配表...','info');
+    const schedMap = DutyParser.parseFiles(dutyBufs);
+
+    setStatus('處理日誌資料...','info');
+    const utMap = buildUserTeamMap();
+    const rows  = LogProcessor.process(logBufs, utMap);
+    if (!rows.length) { setStatus('篩選後無任何資料，請確認檔案格式。','err'); btn.disabled=false; return; }
+
+    setStatus('偵測異常...','info');
+    const abnormal = AnomalyDetector.detect(rows, schedMap);
+
+    setStatus('執行抽樣...','info');
+    const sampled = Sampler.sample(rows, abnormal, sysRatios);
+
+    showSummary(rows, abnormal, sampled);
+
+    setStatus('產生輸出檔案...','info');
+    const links=[];
+    const exB=exportAuditExcel(sampled,abnormal); if(exB) links.push({b:exB,n:`稽核結果_${yr}${mo}.xlsx`});
+    const t3B=exportTable3(rows,sampled,yr,mo); if(t3B) links.push({b:t3B,n:`表3-${yr}${mo}警政日誌稽核工作執行情形調查表.xlsx`});
+    const mpB=exportMP(rows,sampled,yr,mo); if(mpB) links.push({b:mpB,n:`${yr}${mo}刑大M-Police統計表.xlsx`});
+
+    if (wordFile) {
+      try {
+        const tmpl=await readFile(wordFile);
+        const mpFn=r=>(r['作業種類']||'').toLowerCase().includes('m_police');
+        const enet=rows.length-rows.filter(mpFn).length;
+        const sc={oi2:rows.filter(r=>r['作業種類']==='戶政資料系統(OI2)').length,oj:rows.filter(r=>r['作業種類']==='國民身分證相片系統(OJ)').length,mp:rows.filter(mpFn).length,ai:rows.filter(r=>r['作業種類']==='智慧分析決策支援系統(AI)').length};
+        const tn=Object.keys(cfg.teams), tt=tn.map(t=>rows.filter(r=>r._team===t).length), ts=tn.map(t=>sampled.filter(r=>r._team===t).length);
+        const otherS=sampled.filter(r=>r['作業種類']!=='戶政資料系統(OI2)'&&r['作業種類']!=='國民身分證相片系統(OJ)'&&!mpFn(r)&&r['作業種類']!=='智慧分析決策支援系統(AI)').length;
+        const ctx={audit_year:yr,audit_month:mo,duty_month:dm,duty_date:dd,total_queries:String(rows.length),total_abnormal_count:String(abnormal.length),enet_total_count:String(enet),oi2_count:String(sc.oi2),oj_count:String(sc.oj),mp_count:String(sc.mp),ai_count:String(sc.ai),team1_total_count:String(tt[0]||0),team2_total_count:String(tt[1]||0),team3_total_count:String(tt[2]||0),team4_total_count:String(tt[3]||0),team5_total_count:String(tt[4]||0),overall_ratio:String(parseFloat(document.getElementById('auditRatio').value)||2),total_sampled_count:String(sampled.length),sampled_oi2_count:String(sampled.filter(r=>r['作業種類']==='戶政資料系統(OI2)').length),sampled_oj_count:String(sampled.filter(r=>r['作業種類']==='國民身分證相片系統(OJ)').length),sampled_mp_count:String(sampled.filter(mpFn).length),sampled_ai_count:String(sampled.filter(r=>r['作業種類']==='智慧分析決策支援系統(AI)').length),sampled_other_count:String(otherS),team1_sampled_count:String(ts[0]||0),team2_sampled_count:String(ts[1]||0),team3_sampled_count:String(ts[2]||0),team4_sampled_count:String(ts[3]||0),team5_sampled_count:String(ts[4]||0),detailed_audit_summary:generateDetailedText(sampled,yr,mo)};
+        const wB=await fillWord(tmpl,ctx); links.push({b:wB,n:`稽核報告_${yr}${mo}.docx`});
+      } catch(e) { document.getElementById('downloadArea').innerHTML+=`<p style="color:var(--danger)">Word 產生失敗：${e.message}</p>`; }
+    }
+
+    document.getElementById('downloadArea').innerHTML='<h3 style="font-size:14px;margin-bottom:10px">下載檔案</h3>'+links.map(({b,n})=>`<a class="dl-btn" href="${URL.createObjectURL(b)}" download="${n}">⬇ ${n}</a>`).join('');
+    setStatus('完成！請下載以下檔案。','ok');
+  } catch(e) {
+    setStatus(`發生錯誤：${e.message}`,'err');
+    console.error(e);
+  }
+  btn.disabled=false;
+}
+
+// ── 初始化 ───────────────────────────────────────────
+bindDrop('logZone','logInput','logList',f=>logFiles.push(f),()=>logFiles);
+bindDrop('dutyZone','dutyInput','dutyList',f=>dutyFiles.push(f),()=>dutyFiles);
+bindDrop('wordZone','wordInput','wordList',f=>{wordFile=f;},()=>wordFile?[wordFile]:[]);
+document.getElementById('runBtn').addEventListener('click',run);
+
+const teams=Object.keys(cfg.teams), sys=cfg.systemsToRemove.length;
+document.getElementById('cfgNote').textContent=`目前設定：${teams.length} 個小隊、排除 ${sys} 個系統。如需修改請切換到「設定」tab。`;
+
+// ── 設定 UI ──────────────────────────────────────────
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+function renderTags(boxId, arr, rerender) {
+  const box=document.getElementById(boxId); box.innerHTML='';
+  arr.forEach((item,i)=>{
+    const t=document.createElement('span'); t.className='tag';
+    t.innerHTML=`${esc(item)} <button>×</button>`;
+    t.querySelector('button').addEventListener('click',()=>{arr.splice(i,1);rerender();});
+    box.appendChild(t);
+  });
+}
+function bindTagAdd(inputId,btnId,arr,rerender){
+  const inp=document.getElementById(inputId),btn=document.getElementById(btnId);
+  const add=()=>{const v=inp.value.trim();if(v&&!arr.includes(v)){arr.push(v);rerender();}inp.value='';};
+  btn.addEventListener('click',add); inp.addEventListener('keydown',e=>{if(e.key==='Enter')add();});
+}
+
+const renderSys=()=>renderTags('sysTagBox',cfg.systemsToRemove,renderSys);
+const renderVague=()=>renderTags('vagueTagBox',cfg.vagueReasons,renderVague);
+const renderReq=()=>renderTags('reqTagBox',cfg.reasonRequiredSystems,renderReq);
+const renderSusp=()=>renderTags('suspTagBox',cfg.suspiciousSystems,renderSusp);
+renderSys(); renderVague(); renderReq(); renderSusp();
+bindTagAdd('sysTagIn','sysTagBtn',cfg.systemsToRemove,renderSys);
+bindTagAdd('vagueTagIn','vagueTagBtn',cfg.vagueReasons,renderVague);
+bindTagAdd('reqTagIn','reqTagBtn',cfg.reasonRequiredSystems,renderReq);
+bindTagAdd('suspTagIn','suspTagBtn',cfg.suspiciousSystems,renderSusp);
+
+function buildTeamBlock(teamName) {
+  const div=document.createElement('div'); div.className='team-block'; div.dataset.team=teamName;
+  const hdr=document.createElement('div'); hdr.className='team-hdr';
+  const nameIn=document.createElement('input'); nameIn.type='text'; nameIn.value=teamName;
+  nameIn.addEventListener('change',()=>{const o=div.dataset.team,n=nameIn.value.trim();if(!n||n===o)return;cfg.teams[n]=cfg.teams[o];delete cfg.teams[o];div.dataset.team=n;});
+  const delBtn=document.createElement('button'); delBtn.className='btn btn-danger btn-sm'; delBtn.textContent='刪除';
+  delBtn.addEventListener('click',()=>{delete cfg.teams[div.dataset.team];div.remove();});
+  hdr.appendChild(nameIn); hdr.appendChild(delBtn);
+  const body=document.createElement('div'); body.className='team-body';
+  const mlist=document.createElement('div'); mlist.className='mtag-list';
+  const renderM=()=>{
+    mlist.innerHTML='';
+    (cfg.teams[div.dataset.team]||[]).forEach((m,i)=>{
+      const t=document.createElement('span'); t.className='mtag';
+      t.innerHTML=`${esc(m)} <button>×</button>`;
+      t.querySelector('button').addEventListener('click',()=>{cfg.teams[div.dataset.team].splice(i,1);renderM();});
+      mlist.appendChild(t);
+    });
+  };
+  renderM();
+  const addRow=document.createElement('div'); addRow.className='tag-add';
+  const addIn=document.createElement('input'); addIn.type='text'; addIn.placeholder='ID-姓名';
+  const addBtn=document.createElement('button'); addBtn.className='btn btn-secondary btn-sm'; addBtn.textContent='新增';
+  const doAdd=()=>{const v=addIn.value.trim();if(!v)return;const k=div.dataset.team;if(!cfg.teams[k])cfg.teams[k]=[];if(!cfg.teams[k].includes(v)){cfg.teams[k].push(v);renderM();}addIn.value='';};
+  addBtn.addEventListener('click',doAdd); addIn.addEventListener('keydown',e=>{if(e.key==='Enter')doAdd();});
+  addRow.appendChild(addIn); addRow.appendChild(addBtn);
+  body.appendChild(mlist); body.appendChild(addRow);
+  div.appendChild(hdr); div.appendChild(body);
+  return div;
+}
+
+function buildDevBlock(devName) {
+  const div=document.createElement('div'); div.className='team-block'; div.dataset.dev=devName;
+  const hdr=document.createElement('div'); hdr.className='team-hdr';
+  const nameIn=document.createElement('input'); nameIn.type='text'; nameIn.value=devName;
+  nameIn.addEventListener('change',()=>{const o=div.dataset.dev,n=nameIn.value.trim();if(!n||n===o)return;cfg.mpoliceDevices[n]=cfg.mpoliceDevices[o];delete cfg.mpoliceDevices[o];div.dataset.dev=n;});
+  const delBtn=document.createElement('button'); delBtn.className='btn btn-danger btn-sm'; delBtn.textContent='刪除';
+  delBtn.addEventListener('click',()=>{delete cfg.mpoliceDevices[div.dataset.dev];div.remove();});
+  hdr.appendChild(nameIn); hdr.appendChild(delBtn);
+  const body=document.createElement('div'); body.className='team-body';
+  const mlist=document.createElement('div'); mlist.className='mtag-list';
+  const renderM=()=>{
+    mlist.innerHTML='';
+    (cfg.mpoliceDevices[div.dataset.dev]||[]).forEach((m,i)=>{
+      const t=document.createElement('span'); t.className='mtag';
+      t.innerHTML=`${esc(m)} <button>×</button>`;
+      t.querySelector('button').addEventListener('click',()=>{cfg.mpoliceDevices[div.dataset.dev].splice(i,1);renderM();});
+      mlist.appendChild(t);
+    });
+  };
+  renderM();
+  const addRow=document.createElement('div'); addRow.className='tag-add';
+  const addIn=document.createElement('input'); addIn.type='text'; addIn.placeholder='姓名';
+  const addBtn=document.createElement('button'); addBtn.className='btn btn-secondary btn-sm'; addBtn.textContent='新增';
+  const doAdd=()=>{const v=addIn.value.trim();if(!v)return;const k=div.dataset.dev;if(!cfg.mpoliceDevices[k])cfg.mpoliceDevices[k]=[];if(!cfg.mpoliceDevices[k].includes(v)){cfg.mpoliceDevices[k].push(v);renderM();}addIn.value='';};
+  addBtn.addEventListener('click',doAdd); addIn.addEventListener('keydown',e=>{if(e.key==='Enter')doAdd();});
+  addRow.appendChild(addIn); addRow.appendChild(addBtn);
+  body.appendChild(mlist); body.appendChild(addRow);
+  div.appendChild(hdr); div.appendChild(body);
+  return div;
+}
+
+const teamsArea=document.getElementById('teamsArea');
+for (const t of Object.keys(cfg.teams)) teamsArea.appendChild(buildTeamBlock(t));
+document.getElementById('addTeamBtn').addEventListener('click',()=>{const n=`新小隊_${Date.now()}`;cfg.teams[n]=[];teamsArea.appendChild(buildTeamBlock(n));});
+
+const devsArea=document.getElementById('devicesArea');
+for (const d of Object.keys(cfg.mpoliceDevices||{})) devsArea.appendChild(buildDevBlock(d));
+document.getElementById('addDevBtn').addEventListener('click',()=>{const n=`新載具_${Date.now()}`;if(!cfg.mpoliceDevices)cfg.mpoliceDevices={};cfg.mpoliceDevices[n]=[];devsArea.appendChild(buildDevBlock(n));});
+
+document.getElementById('saveBtn').addEventListener('click',()=>{
+  saveCfg();
+  const msg=document.getElementById('saveMsg'); msg.textContent='設定已儲存！'; msg.className='status show ok';
+  setTimeout(()=>{msg.className='status';msg.textContent='';},2500);
+});
+document.getElementById('resetBtn').addEventListener('click',()=>{
+  if(!confirm('確定要恢復所有預設值嗎？')) return;
+  cfg=JSON.parse(JSON.stringify(DEFAULT_CONFIG)); saveCfg();
+  location.reload();
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PDF 工具 — 線上工具箱</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../css/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+</head>
+<body x-data="pdfApp()">
+  <nav class="navbar">
+    <a class="navbar-title" href="../index.html">← 線上工具箱</a>
+    <span class="navbar-badge">PDF 工具</span>
+  </nav>
+  <div class="subbar">合併・分割・旋轉・加密/解密</div>
+
+  <div class="container" style="padding-bottom:60px">
+    <div class="tabs">
+      <button class="tab-btn" :class="{ active: tab === 'merge' }"   @click="tab = 'merge';   reset()">合併</button>
+      <button class="tab-btn" :class="{ active: tab === 'split' }"   @click="tab = 'split';   reset()">分割</button>
+      <button class="tab-btn" :class="{ active: tab === 'rotate' }"  @click="tab = 'rotate';  reset()">旋轉</button>
+      <button class="tab-btn" :class="{ active: tab === 'encrypt' }" @click="tab = 'encrypt'; reset()">加密/解密</button>
+    </div>
+
+    <div x-show="tab === 'merge'">
+      <div class="drop-zone"
+           @dragover.prevent="$el.classList.add('dragover')"
+           @dragleave="$el.classList.remove('dragover')"
+           @drop.prevent="$el.classList.remove('dragover'); handleMergeFiles($event.dataTransfer.files)"
+           @click="$refs.mergeInput.click()">
+        <input type="file" x-ref="mergeInput" multiple accept=".pdf" style="display:none"
+               @change="handleMergeFiles($event.target.files)">
+        <div style="font-size:32px">📄</div>
+        <p>點擊或拖曳 PDF 檔案（可多選）</p>
+      </div>
+      <template x-if="mergeFiles.length > 0">
+        <div>
+          <div class="file-list">
+            <template x-for="(f, i) in mergeFiles" :key="f.name + i">
+              <div class="file-item">
+                <canvas :id="'mt-' + i" class="thumb"></canvas>
+                <span class="file-name" x-text="f.name"></span>
+                <div style="display:flex; flex-direction:column; gap:4px">
+                  <button class="btn btn-secondary btn-sm" @click="mergeMoveUp(i)"   :disabled="i === 0">▲</button>
+                  <button class="btn btn-secondary btn-sm" @click="mergeMoveDown(i)" :disabled="i === mergeFiles.length - 1">▼</button>
+                  <button class="btn btn-secondary btn-sm" @click="mergeFiles.splice(i,1); mergeFiles=[...mergeFiles]">✕</button>
+                </div>
+              </div>
+            </template>
+          </div>
+          <button class="btn btn-primary" @click="doMerge()" :disabled="merging"
+                  x-text="merging ? '合併中...' : '合併並下載'"></button>
+        </div>
+      </template>
+      <div x-show="mergeMsg" class="msg"
+           :class="mergeMsg && mergeMsg.type === 'error' ? 'msg-error' : 'msg-success'"
+           x-text="mergeMsg && mergeMsg.text"></div>
+    </div>
+
+    <div x-show="tab === 'split'">
+      <div class="drop-zone"
+           @click="$refs.splitInput.click()"
+           @dragover.prevent="$el.classList.add('dragover')"
+           @dragleave="$el.classList.remove('dragover')"
+           @drop.prevent="$el.classList.remove('dragover'); handleSplitFile($event.dataTransfer.files[0])">
+        <input type="file" x-ref="splitInput" accept=".pdf" style="display:none"
+               @change="handleSplitFile($event.target.files[0])">
+        <div style="font-size:32px">📄</div>
+        <p x-text="splitFile ? splitFile.name : '點擊或拖曳單一 PDF 檔案'"></p>
+      </div>
+      <template x-if="splitPages.length > 0">
+        <div>
+          <p style="font-size:13px; color:#7f8c8d; margin-bottom:10px">點擊縮圖選取要保留的頁面（橘框 = 選取）</p>
+          <div class="page-grid">
+            <template x-for="(page, i) in splitPages" :key="i">
+              <div class="page-thumb" :class="{ selected: page.selected }" @click="page.selected = !page.selected">
+                <canvas :id="'sp-' + i"></canvas>
+                <div class="page-num" x-text="'第 ' + (i+1) + ' 頁'"></div>
+              </div>
+            </template>
+          </div>
+          <div style="display:flex; gap:8px; align-items:center; margin-bottom:12px; flex-wrap:wrap">
+            <button class="btn btn-secondary btn-sm" @click="splitPages.forEach(p => p.selected = true)">全選</button>
+            <button class="btn btn-secondary btn-sm" @click="splitPages.forEach(p => p.selected = false)">全不選</button>
+            <span style="font-size:13px; color:#7f8c8d">已選 <span x-text="splitPages.filter(p => p.selected).length"></span> 頁</span>
+          </div>
+          <button class="btn btn-primary" @click="doSplit()" :disabled="splitting"
+                  x-text="splitting ? '處理中...' : '儲存選取頁面'"></button>
+        </div>
+      </template>
+      <div x-show="splitMsg" class="msg"
+           :class="splitMsg && splitMsg.type === 'error' ? 'msg-error' : 'msg-success'"
+           x-text="splitMsg && splitMsg.text"></div>
+    </div>
+
+    <div x-show="tab === 'rotate'">
+      <div class="drop-zone"
+           @click="$refs.rotateInput.click()"
+           @dragover.prevent="$el.classList.add('dragover')"
+           @dragleave="$el.classList.remove('dragover')"
+           @drop.prevent="$el.classList.remove('dragover'); handleRotateFile($event.dataTransfer.files[0])">
+        <input type="file" x-ref="rotateInput" accept=".pdf" style="display:none"
+               @change="handleRotateFile($event.target.files[0])">
+        <div style="font-size:32px">📄</div>
+        <p x-text="rotateFile ? rotateFile.name : '點擊或拖曳 PDF 檔案'"></p>
+      </div>
+      <template x-if="rotatePages.length > 0">
+        <div>
+          <p style="font-size:13px; color:#7f8c8d; margin-bottom:10px">點擊「旋轉」可順時針旋轉 90°，點四次回到原方向</p>
+          <div class="page-grid">
+            <template x-for="(page, i) in rotatePages" :key="i">
+              <div class="page-thumb">
+                <div style="overflow:hidden; display:flex; justify-content:center; align-items:center; min-height:80px">
+                  <canvas :id="'rp-' + i"
+                          :style="'transform: rotate(' + page.rotation + 'deg); transition: transform 0.2s; width:100%; max-width:100px'"></canvas>
+                </div>
+                <div class="page-num" x-text="'第 ' + (i+1) + ' 頁（' + page.rotation + '°）'"></div>
+                <button class="btn btn-secondary btn-sm" style="width:100%; margin-top:4px"
+                        @click="page.rotation = (page.rotation + 90) % 360">旋轉 90°</button>
+              </div>
+            </template>
+          </div>
+          <button class="btn btn-primary" @click="doRotate()" :disabled="rotating"
+                  x-text="rotating ? '處理中...' : '儲存旋轉結果'"></button>
+        </div>
+      </template>
+      <div x-show="rotateMsg" class="msg"
+           :class="rotateMsg && rotateMsg.type === 'error' ? 'msg-error' : 'msg-success'"
+           x-text="rotateMsg && rotateMsg.text"></div>
+    </div>
+
+    <div x-show="tab === 'encrypt'">
+      <div style="background:white; border-radius:10px; padding:32px 24px; text-align:center; box-shadow:0 1px 4px rgba(0,0,0,0.08)">
+        <div style="font-size:48px; margin-bottom:16px">🔒</div>
+        <h3 style="font-size:16px; margin-bottom:10px; color:#2c3e50">加密/解密請使用本機版工具</h3>
+        <p style="font-size:14px; color:#7f8c8d; line-height:1.8; margin-bottom:20px">
+          PDF 加密涉及敏感資料，建議在本機執行而非瀏覽器。<br>
+          請下載「圖片壓縮工具」同一套件內附的 <strong>PDF 加密工具</strong>（本機版），<br>
+          功能更穩定，資料不經過任何伺服器。
+        </p>
+        <div style="background:#f8f9fa; border-radius:8px; padding:16px; font-size:13px; color:#555; text-align:left; display:inline-block">
+          <b>本機版支援功能：</b><br>
+          ・設定開啟密碼（加密）<br>
+          ・移除密碼保護（解密）<br>
+          ・支援 128-bit / 256-bit AES 加密
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">工具箱 v1.0</div>
+
+  <script>
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+    function pdfApp() {
+      return {
+        tab: 'merge',
+
+        // 合併
+        mergeFiles: [], merging: false, mergeMsg: null,
+        // 分割
+        splitFile: null, splitPages: [], splitting: false, splitMsg: null,
+        // 旋轉
+        rotateFile: null, rotatePages: [], rotating: false, rotateMsg: null,
+        // 加密/解密
+        encryptFile: null, encryptMode: 'encrypt', encryptPassword: '', encrypting: false, encryptMsg: null,
+
+        reset() {
+          this.mergeFiles = []; this.merging = false; this.mergeMsg = null;
+          this.splitFile = null; this.splitPages = []; this.splitting = false; this.splitMsg = null;
+          this.rotateFile = null; this.rotatePages = []; this.rotating = false; this.rotateMsg = null;
+          this.encryptFile = null; this.encryptMode = 'encrypt'; this.encryptPassword = ''; this.encrypting = false; this.encryptMsg = null;
+        },
+
+        downloadBytes(bytes, filename) {
+          const blob = new Blob([bytes], { type: 'application/pdf' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url; a.download = filename; a.click();
+          URL.revokeObjectURL(url);
+        },
+
+        async renderFirstPage(file, canvasId) {
+          const url = URL.createObjectURL(file);
+          const pdf = await pdfjsLib.getDocument(url).promise;
+          const page = await pdf.getPage(1);
+          const viewport = page.getViewport({ scale: 0.3 });
+          const canvas = document.getElementById(canvasId);
+          if (!canvas) { URL.revokeObjectURL(url); return; }
+          canvas.width = viewport.width;
+          canvas.height = viewport.height;
+          await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+          URL.revokeObjectURL(url);
+        },
+
+        async renderAllPages(file, canvasIdPrefix) {
+          const url = URL.createObjectURL(file);
+          const pdf = await pdfjsLib.getDocument(url).promise;
+          for (let i = 0; i < pdf.numPages; i++) {
+            const page = await pdf.getPage(i + 1);
+            const viewport = page.getViewport({ scale: 0.3 });
+            const canvas = document.getElementById(canvasIdPrefix + i);
+            if (!canvas) continue;
+            canvas.width = viewport.width;
+            canvas.height = viewport.height;
+            await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+          }
+          URL.revokeObjectURL(url);
+        },
+
+        // --- 合併 ---
+        async handleMergeFiles(fileList) {
+          const pdfs = Array.from(fileList).filter(f => f.type === 'application/pdf');
+          const start = this.mergeFiles.length;
+          this.mergeFiles = [...this.mergeFiles, ...pdfs];
+          await this.$nextTick();
+          for (let i = start; i < this.mergeFiles.length; i++) {
+            await this.renderFirstPage(this.mergeFiles[i], 'mt-' + i);
+          }
+        },
+
+        async mergeMoveUp(i) {
+          if (i === 0) return;
+          [this.mergeFiles[i-1], this.mergeFiles[i]] = [this.mergeFiles[i], this.mergeFiles[i-1]];
+          this.mergeFiles = [...this.mergeFiles];
+          await this.$nextTick();
+          for (let j = i-1; j <= i; j++) await this.renderFirstPage(this.mergeFiles[j], 'mt-' + j);
+        },
+
+        async mergeMoveDown(i) {
+          if (i === this.mergeFiles.length - 1) return;
+          [this.mergeFiles[i], this.mergeFiles[i+1]] = [this.mergeFiles[i+1], this.mergeFiles[i]];
+          this.mergeFiles = [...this.mergeFiles];
+          await this.$nextTick();
+          for (let j = i; j <= i+1; j++) await this.renderFirstPage(this.mergeFiles[j], 'mt-' + j);
+        },
+
+        async doMerge() {
+          this.merging = true; this.mergeMsg = null;
+          try {
+            const merged = await PDFLib.PDFDocument.create();
+            for (const file of this.mergeFiles) {
+              const doc = await PDFLib.PDFDocument.load(await file.arrayBuffer());
+              const pages = await merged.copyPages(doc, doc.getPageIndices());
+              pages.forEach(p => merged.addPage(p));
+            }
+            this.downloadBytes(await merged.save(), 'merged.pdf');
+            this.mergeMsg = { type: 'success', text: '合併完成！' };
+          } catch (e) {
+            this.mergeMsg = { type: 'error', text: '合併失敗：' + e.message };
+          }
+          this.merging = false;
+        },
+
+        // --- 分割 ---
+        async handleSplitFile(file) {
+          if (!file) return;
+          this.splitFile = file;
+          this.splitPages = [];
+          const url = URL.createObjectURL(file);
+          const pdf = await pdfjsLib.getDocument(url).promise;
+          this.splitPages = Array.from({ length: pdf.numPages }, (_, i) => ({ index: i, selected: false }));
+          URL.revokeObjectURL(url);
+          await this.$nextTick();
+          await this.renderAllPages(file, 'sp-');
+        },
+
+        async doSplit() {
+          const selected = this.splitPages.filter(p => p.selected);
+          if (selected.length === 0) {
+            this.splitMsg = { type: 'error', text: '請至少選取一頁' };
+            return;
+          }
+          this.splitting = true; this.splitMsg = null;
+          try {
+            const src = await PDFLib.PDFDocument.load(await this.splitFile.arrayBuffer());
+            const out = await PDFLib.PDFDocument.create();
+            const pages = await out.copyPages(src, selected.map(p => p.index));
+            pages.forEach(p => out.addPage(p));
+            this.downloadBytes(await out.save(), 'split.pdf');
+            this.splitMsg = { type: 'success', text: '分割完成！' };
+          } catch (e) {
+            this.splitMsg = { type: 'error', text: '分割失敗：' + e.message };
+          }
+          this.splitting = false;
+        },
+
+        // --- 旋轉 ---
+        async handleRotateFile(file) {
+          if (!file) return;
+          this.rotateFile = file;
+          const url = URL.createObjectURL(file);
+          const pdf = await pdfjsLib.getDocument(url).promise;
+          this.rotatePages = Array.from({ length: pdf.numPages }, (_, i) => ({ index: i, rotation: 0 }));
+          URL.revokeObjectURL(url);
+          await this.$nextTick();
+          await this.renderAllPages(file, 'rp-');
+        },
+
+        async doRotate() {
+          this.rotating = true; this.rotateMsg = null;
+          try {
+            const doc = await PDFLib.PDFDocument.load(await this.rotateFile.arrayBuffer());
+            const pages = doc.getPages();
+            this.rotatePages.forEach(rp => {
+              if (rp.rotation !== 0) pages[rp.index].setRotation(PDFLib.degrees(rp.rotation));
+            });
+            this.downloadBytes(await doc.save(), 'rotated.pdf');
+            this.rotateMsg = { type: 'success', text: '旋轉完成！' };
+          } catch (e) {
+            this.rotateMsg = { type: 'error', text: '旋轉失敗：' + e.message };
+          }
+          this.rotating = false;
+        },
+
+        // --- 加密/解密 ---
+        async doEncrypt() {
+          if (!this.encryptPassword) {
+            this.encryptMsg = { type: 'error', text: '請輸入密碼' };
+            return;
+          }
+          this.encrypting = true; this.encryptMsg = null;
+          try {
+            const bytes = await this.encryptFile.arrayBuffer();
+            if (this.encryptMode === 'encrypt') {
+              const doc = await PDFLib.PDFDocument.load(bytes);
+              const out = await doc.save({
+                userPassword: this.encryptPassword,
+                ownerPassword: this.encryptPassword,
+                permissions: { printing: 'highResolution', modifying: false, copying: false }
+              });
+              this.downloadBytes(out, 'encrypted.pdf');
+              this.encryptMsg = { type: 'success', text: '加密完成！' };
+            } else {
+              const doc = await PDFLib.PDFDocument.load(bytes, { password: this.encryptPassword });
+              this.downloadBytes(await doc.save(), 'decrypted.pdf');
+              this.encryptMsg = { type: 'success', text: '解密完成！' };
+            }
+          } catch (e) {
+            this.encryptMsg = {
+              type: 'error',
+              text: (this.encryptMode === 'decrypt' ? '解密失敗，密碼可能錯誤：' : '加密失敗：') + e.message
+            };
+          }
+          this.encrypting = false;
+        }
+      }
+    }
+  </script>
+</body>
+</html>
