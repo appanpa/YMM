@@ -201,6 +201,7 @@ main { max-width: 900px; margin: 24px auto; padding: 0 16px 60px; }
     <div style="display:flex;gap:10px;margin-bottom:20px">
       <button class="btn btn-primary btn-sm" id="saveBtn">儲存設定</button>
       <button class="btn btn-secondary btn-sm" id="resetBtn">恢復預設值</button>
+      <button class="btn btn-sm" id="clearStorageBtn" style="background:#e74c3c;color:white;border:none">清除所有設定</button>
     </div>
     <div class="status" id="saveMsg"></div>
 
@@ -312,11 +313,15 @@ const extractName = a => { const i = a.lastIndexOf('-'); return i !== -1 ? a.sli
 // ── 勤務表解析 ──────────────────────────────────────
 const DutyParser = {
   cleanName(s) { return s ? String(s).replace(/[（(][^）)]*[）)]/g,'').trim() : ''; },
-  parseDateFromTitle(s) {
-    const m = String(s||'').match(/(\d{2,3})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/);
-    if (!m) return null;
-    const y = parseInt(m[1]) < 1911 ? parseInt(m[1])+1911 : parseInt(m[1]);
-    return `${y}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`;
+  parseDateFromTitle(row0) {
+    for (const cell of (row0 || [])) {
+      const m = String(cell||'').match(/(\d{2,3})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/);
+      if (m) {
+        const y = parseInt(m[1]) < 1911 ? parseInt(m[1])+1911 : parseInt(m[1]);
+        return `${y}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`;
+      }
+    }
+    return null;
   },
   sheetToArray(ws) {
     const rng = XLSX.utils.decode_range(ws['!ref']||'A1');
@@ -334,14 +339,22 @@ const DutyParser = {
     const ws = wb.Sheets[sn];
     const rows = this.sheetToArray(ws);
 
-    const dateKey = this.parseDateFromTitle(String((rows[0]||[])[6]||''));
+    const dateKey = this.parseDateFromTitle(rows[0]);
     if (!dateKey) return null;
+
+    // 自動偵測人員名冊欄位：在 row 2 (0-indexed) 找「代號」表頭的位置
+    const headerRow2 = rows[2] || [];
+    const personnelGroups = [];
+    for (let c = 0; c < headerRow2.length; c++) {
+      if (String(headerRow2[c]||'').trim() === '代號') personnelGroups.push([c, c+1, c+2]);
+    }
+    if (!personnelGroups.length) personnelGroups.push([6,7,8],[9,10,11],[12,13,14]);
 
     // 解析人員名冊（代號→姓名、假別）
     const personnel = {};
-    for (let r = 3; r <= Math.min(rows.length-1, 10); r++) {
+    for (let r = 3; r <= Math.min(rows.length-1, 13); r++) {
       const row = rows[r]||[];
-      [[6,7,8],[9,10,11],[12,13,14]].forEach(([cc,nc,lc]) => {
+      personnelGroups.forEach(([cc,nc,lc]) => {
         const code = row[cc], name = row[nc], leave = row[lc];
         if (code !== null && code !== undefined && !isNaN(Number(code))) {
           const cn = this.cleanName(String(name||''));
@@ -353,16 +366,22 @@ const DutyParser = {
       });
     }
 
-    // 利用合併儲存格範圍解析服勤小時
-    // 勤務欄：B~E（0-indexed col 1~4），時段從 row 7（0-indexed）起
-    // 時段列為奇數（0-indexed）：r=7,9,11,...
-    // 小時換算：((r - 7) / 2 + 8) % 24
+    // 自動偵測勤務項目欄位：在 row 2 (0-indexed) 掃描 col 1-8，有名稱即為勤務欄
+    const colDutyName = {};
+    for (let c = 1; c <= 8; c++) {
+      const raw = String(headerRow2[c] || '').trim();
+      if (raw && !['代號','姓名','假別'].includes(raw)) {
+        colDutyName[c] = raw.replace(/[（(][^）)]*[）)]/g, '').trim() || '值班';
+      }
+    }
+
+    // 利用合併儲存格範圍解析服勤小時及勤務項目
     const merges = ws['!merges'] || [];
-    const personHours = {}; // code → Set<hour>
+    const personHours = {}; // code → Map<hour, dutyName>
 
     for (const mg of merges) {
       const { s: { r: rs, c: cs }, e: { r: re } } = mg;
-      if (cs < 1 || cs > 4 || rs < 7) continue;
+      if (!colDutyName[cs] || rs < 7) continue;
       const cellAddr = XLSX.utils.encode_cell({ r: rs, c: cs });
       const cell = ws[cellAddr];
       if (!cell || cell.v === null || cell.v === undefined) continue;
@@ -371,12 +390,13 @@ const DutyParser = {
       const codes = [];
       val.split(/[,，、\s]+/).forEach(p => { const n = parseInt(p.trim()); if (!isNaN(n)) codes.push(n); });
       if (!codes.length) continue;
+      const dutyName = colDutyName[cs] || '值班';
       for (let r = rs; r <= re; r++) {
-        if (r % 2 !== 1) continue; // 只處理奇數列（0-indexed）= 時段列
+        if (r % 2 !== 1) continue;
         const hour = ((r - 7) / 2 + 8) % 24;
         for (const code of codes) {
-          if (!personHours[code]) personHours[code] = new Set();
-          personHours[code].add(Math.round(hour));
+          if (!personHours[code]) personHours[code] = new Map();
+          personHours[code].set(Math.round(hour), dutyName);
         }
       }
     }
@@ -643,11 +663,18 @@ function getDutyLabel(name, dt, scheduleMap) {
   const rd = getRosterDate(dt);
   const h = scheduleMap[rd] && scheduleMap[rd].personHours && scheduleMap[rd].personHours[name];
   if (!h) return '＿＿＿＿';
-  const hasNight  = h.has(20) || h.has(21) || h.has(22) || h.has(23);
-  const hasEarlyAM = h.has(0) || h.has(1);
-  if (hasNight && hasEarlyAM) return '值宿勤務(20-08)';
-  if (hasNight) return '夜間勤務';
-  return '日勤勤務(08-20)';
+  // 取查詢當下小時的勤務名稱；若當下不在勤務（備援用），取第一個
+  const dutyName = h.get(dt.getHours()) || [...h.values()][0] || '值班';
+  // 只取該勤務項目的小時，計算實際時段
+  const dutyHrs = [...h.entries()].filter(([,v]) => v === dutyName).map(([k]) => k).sort((a,b) => a-b);
+  const p = x => String(x).padStart(2, '0');
+  const hasNight = dutyHrs.some(x => x >= 20), hasEarlyAM = dutyHrs.some(x => x < 8);
+  if (hasNight && hasEarlyAM) {
+    const s = Math.min(...dutyHrs.filter(x => x >= 20));
+    const e = Math.max(...dutyHrs.filter(x => x < 8)) + 1;
+    return `${dutyName}勤務(${p(s)}-${p(e)})`;
+  }
+  return `${dutyName}勤務(${p(Math.min(...dutyHrs))}-${p(Math.max(...dutyHrs) + 1)})`;
 }
 
 function generateDetailedText(sampled, yr, mo, scheduleMap) {
@@ -763,6 +790,12 @@ async function run() {
 
     setStatus('解析勤務分配表...','info');
     const schedMap = DutyParser.parseFiles(dutyBufs);
+    console.log('[DutyParser] schedMap keys:', Object.keys(schedMap));
+    for (const [dk, v] of Object.entries(schedMap)) {
+      const ph = v.personHours;
+      const sample = Object.keys(ph).slice(0,3).map(n => `${n}:${[...ph[n].keys()].slice(0,4).join(',')}`);
+      console.log(`  ${dk}: 人員=${Object.keys(ph).join(',')} | onLeave=${v.onLeave} | 抽樣小時=[${sample}]`);
+    }
 
     setStatus('處理日誌資料...','info');
     const utMap = buildUserTeamMap();
@@ -921,6 +954,12 @@ document.getElementById('resetBtn').addEventListener('click',()=>{
   if(!confirm('確定要恢復所有預設值嗎？')) return;
   cfg=JSON.parse(JSON.stringify(DEFAULT_CONFIG)); saveCfg();
   location.reload();
+});
+document.getElementById('clearStorageBtn').addEventListener('click',()=>{
+  if(!confirm('確定要清除所有設定？\n\n這將刪除小隊名單、人員清單、各項設定等所有資料，適合在公用電腦作業結束後使用。\n\n清除後需要重新設定，無法復原。')) return;
+  localStorage.removeItem(CFG_KEY);
+  const msg=document.getElementById('saveMsg'); msg.textContent='已清除所有設定。'; msg.className='status show ok';
+  setTimeout(()=>location.reload(), 1500);
 });
 </script>
 </body>
